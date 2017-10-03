@@ -1,0 +1,5 @@
+*.ibc
+*.swp
+
+node_modules
+build
