@@ -1,0 +1,5 @@
+package event
+
+pkgs = record_, idrisscript
+
+modules = Event
