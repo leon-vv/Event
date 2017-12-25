@@ -1,38 +1,51 @@
 module Event
 
-%access public export
-%default total
+import Record
+import Record.JS
 
-Time : Type
-Time = Nat
+import IdrisScript
 
-Timeline : Type -> Type
-Timeline t = Time -> t
+%include JavaScript "runtime.js"
 
-map : Timeline a -> (a -> b) -> Timeline b
-map tl f = \t => f (tl t)
-
-return : a -> Timeline a
-return a t = a
-
+public export
 Event : Type -> Type
-Event t = Timeline (Maybe t)
+Event t = JS_IO (Maybe t)
 
+export
 combine : Event a -> Event a -> Event a
-combine tl1 tl2 t = (tl1 t) <|> (tl2 t)
+combine ev1 ev2 = do
+    a1 <- ev1
+    a2 <- ev2
+    pure (a1 <|> a2)
 
-ExtEvent : Type -> Type
-ExtEvent t = Timeline (JS_IO (Maybe t))
+setupState : Ptr -> JsFn (Ptr -> JS_IO Ptr) -> JS_IO ()
+setupState = jscall "setupState(%0, %1)" (Ptr -> JsFn (Ptr -> JS_IO Ptr) -> JS_IO ())
 
-Feedback : Type -> Type
-Feedback state = state -> Timeline state
+export
+run : (initial: state) -> (state -> JS_IO state) -> JS_IO ()
+run init nextState = setupState (believe_me init) (MkJsFn nextStateJS)
+  where
+    nextStateJS : Ptr -> JS_IO Ptr
+    nextStateJS old = do new <- nextState (believe_me old); pure (believe_me new)
 
-foldp : Timeline a -> (st -> a -> st) -> Feedback st
-foldp tl f state time = f state (tl time)
+namespace JS
+  mouseClick_ : JS_IO JSRef
+  mouseClick_ = jscall "mouseClick.getValue()" (JS_IO JSRef)
 
-record Interface (state : Type) (res : Type) where
-  constructor MkInterface
-  feedback : Feedback state
-  toResult : state -> res
+  eventReferenceToRecord : {sc : Schema} -> {auto fp : schemaImp sc FromJSD} -> JSRef -> JS_IO (Maybe (Record sc))
+  eventReferenceToRecord {fp} {sc} ref = do 
+    rec <- objectToRecordUnsafe {schema=[("set", Bool), ("value", JSRef)]} ref
+    (if rec .. "set" then map Just (objectToRecordUnsafe {schema=sc} (rec .. "value"))
+                     else pure Nothing)
+
+  export
+  mouseClick : Event (Double, Double)
+  mouseClick = do
+      eventObj <- mouseClick_
+      maybeRec <- eventReferenceToRecord {sc=[("clientX", Double), ("clientY", Double)]} eventObj
+      (case maybeRec of
+           Nothing => pure Nothing
+           Just r => pure (Just (r .. "clientX", r .. "clientY")))
+
 
 
