@@ -10,12 +10,12 @@ import IdrisScript
 %include JavaScript "./Event/runtime.js"
 %include Node "./Event/runtime.js"
 
-export
+public export
 Event : Type -> Type
 Event t = JS_IO (Maybe t)
 
 export
-map : (a -> b) -> JS_IO (Maybe a) -> Event b
+map : (a -> b) -> Event a -> Event b
 map f ev = ev >>= (pure . (map f))
 
 export
