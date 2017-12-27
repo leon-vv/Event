@@ -7,8 +7,8 @@ import IdrisScript
 
 %default total
 
-%include JavaScript "runtime.js"
-%include Node "runtime.js"
+%include JavaScript "./Event/runtime.js"
+%include Node "./Event/runtime.js"
 
 export
 Event : Type -> Type
