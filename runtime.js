@@ -25,10 +25,6 @@ function Event(setCallback) {
     };
 }
 
-var mouseClick = new Event(function(cb) {
-    document.addEventListener("click", cb);
-});
-
 var state = null;
 var triggerFun = null;
 

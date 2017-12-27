@@ -29,23 +29,6 @@ run init nextState = setupState (believe_me init) (MkJsFn nextStateJS)
     nextStateJS old = do new <- nextState (believe_me old); pure (believe_me new)
 
 namespace JS
-  mouseClick_ : JS_IO JSRef
-  mouseClick_ = jscall "mouseClick.getValue()" (JS_IO JSRef)
-
-  eventReferenceToRecord : {sc : Schema} -> {auto fp : schemaImp sc FromJSD} -> JSRef -> JS_IO (Maybe (Record sc))
-  eventReferenceToRecord {fp} {sc} ref = do 
-    rec <- objectToRecordUnsafe {schema=[("set", Bool), ("value", JSRef)]} ref
-    (if rec .. "set" then map Just (objectToRecordUnsafe {schema=sc} (rec .. "value"))
-                     else pure Nothing)
-
   export
-  mouseClick : Event (Double, Double)
-  mouseClick = do
-      eventObj <- mouseClick_
-      maybeRec <- eventReferenceToRecord {sc=[("clientX", Double), ("clientY", Double)]} eventObj
-      (case maybeRec of
-           Nothing => pure Nothing
-           Just r => pure (Just (r .. "clientX", r .. "clientY")))
-
 
 
