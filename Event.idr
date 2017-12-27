@@ -46,4 +46,11 @@ namespace JS
     rec <- objectToRecordUnsafe {schema=[("set", Bool), ("value", JSRef)]} obj
     (if rec .. "set" then Functor.map Just (objectToRecordUnsafe {fp=ip} {schema=sch} (rec .. "value"))
                      else pure Nothing)
+  %inline                     
+  export
+  partial
+  fromString : {auto ip : schemaImp sch FromJSD} -> String -> Event (Record sch)
+  fromString {ip} {sch} s = do
+    eventRef <- jscall s (JS_IO JSRef)
+    fromEventReference {ip=ip} {sch=sch} eventRef
 
