@@ -32,11 +32,13 @@ setupState = jscall "setupState(%0, %1)" (Ptr -> JsFn (Ptr -> JS_IO Ptr) -> JS_I
 namespace JS
   export
   partial
-  run : (initial: state) -> (state -> JS_IO state) -> JS_IO ()
-  run init nextState = setupState (believe_me init) (MkJsFn nextStateJS)
-    where
-      nextStateJS : Ptr -> JS_IO Ptr
-      nextStateJS old = do new <- nextState (believe_me old); pure (believe_me new)
+  run : (initial: JS_IO state) -> (state -> JS_IO state) -> JS_IO ()
+  run initIO nextState = (do 
+        init <- initIO
+        setupState (believe_me init) (MkJsFn nextStateJS))
+        where
+          nextStateJS : Ptr -> JS_IO Ptr
+          nextStateJS old = do new <- nextState (believe_me old); pure (believe_me new)
 
   export
   partial
@@ -49,8 +51,8 @@ namespace JS
   %inline                     
   export
   partial
-  fromString : {auto ip : schemaImp sch FromJSD} -> String -> Event (Record sch)
+  fromString : {auto ip : schemaImp sch FromJSD} -> String -> JS_IO (Event (Record sch))
   fromString {ip} {sch} s = do
-    eventRef <- jscall s (JS_IO JSRef)
-    fromEventReference {ip=ip} {sch=sch} eventRef
+    eventRef <- jscall ("(" ++ s ++ ")()") (JS_IO JSRef)
+    pure (fromEventReference {ip=ip} {sch=sch} eventRef)
 

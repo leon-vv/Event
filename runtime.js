@@ -1,7 +1,7 @@
 
 var clearFun = null;
 
-function Event(setCallback) {
+function EventHandle(setCallback) {
 
     var lastValueSet = false;
     var lastValue = {};
@@ -24,6 +24,14 @@ function Event(setCallback) {
         };
     };
 }
+
+function eventGenerator(setCallback) {
+    
+    return function () {
+        return new EventHandle(setCallback);
+    }
+}
+
 
 var state = null;
 var triggerFun = null;

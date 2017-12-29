@@ -8,8 +8,8 @@ import Record.JS
 State : Type
 State = Int
 
-initialState : State
-initialState = 0
+initialState : JS_IO State
+initialState = pure 0
 
 nextState : State -> JS_IO State
 nextState st = do
