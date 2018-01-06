@@ -53,7 +53,7 @@ namespace JS
 
   export
   partial
-  fromEventReference : {auto ip : schemaImp sch FromJSD} -> JSRef -> Event (Record sch)
+  fromEventReference : {auto ip : SchemaImp sch FromJSD} -> JSRef -> Event (Record sch)
   fromEventReference {ip} {sch} eventRef = do
     obj <- jscall "%0.getValue()" (JSRef -> JS_IO JSRef) eventRef
     rec <- objectToRecordUnsafe {schema=[("set", Bool), ("value", JSRef)]} obj
@@ -65,14 +65,14 @@ namespace JS
   %inline                     
   export
   partial
-  fromGeneratorString : {auto ip : schemaImp sch FromJSD} -> String -> JS_IO (Event (Record sch))
+  fromGeneratorString : {auto ip : SchemaImp sch FromJSD} -> String -> JS_IO (Event (Record sch))
   fromGeneratorString {ip} {sch} s = do
     eventRef <- jscall ("(" ++ s ++ ")()") (JS_IO JSRef)
     pure (fromEventReference {ip=ip} {sch=sch} eventRef)
 
   export
   partial
-  fromGeneratorReference : {auto ip : schemaImp sch FromJSD} -> JSRef -> JS_IO (Event (Record sch))
+  fromGeneratorReference : {auto ip : SchemaImp sch FromJSD} -> JSRef -> JS_IO (Event (Record sch))
   fromGeneratorReference {ip} {sch} ref = do
     eventRef <- jscall "%0.apply()" (JSRef -> JS_IO JSRef) ref
     pure (fromEventReference {ip=ip} {sch=sch} eventRef)
