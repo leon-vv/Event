@@ -30,6 +30,17 @@ setupState : Ptr -> JsFn (Ptr -> JS_IO Ptr) -> JS_IO ()
 setupState = jscall "setupState(%0, %1)" (Ptr -> JsFn (Ptr -> JS_IO Ptr) -> JS_IO ())
 
 namespace JS
+  private
+  invertIO : Maybe (JS_IO a) -> JS_IO (Maybe a)
+  invertIO (Just io) = do
+    v <- io
+    pure (Just v)
+  invertIO Nothing = pure Nothing
+
+  export
+  mapIO : (a -> JS_IO b) -> Event a -> Event b
+  mapIO f ev = ev >>= (invertIO . map f)
+  
   export
   partial
   run : (initial: JS_IO state) -> (state -> JS_IO state) -> JS_IO ()
@@ -48,11 +59,22 @@ namespace JS
     rec <- objectToRecordUnsafe {schema=[("set", Bool), ("value", JSRef)]} obj
     (if rec .. "set" then Functor.map Just (objectToRecordUnsafe {fp=ip} {schema=sch} (rec .. "value"))
                      else pure Nothing)
+
+  -- Given a string which evaluates to an event generator, return an IO action
+  -- which will return an event
   %inline                     
   export
   partial
-  fromString : {auto ip : schemaImp sch FromJSD} -> String -> JS_IO (Event (Record sch))
-  fromString {ip} {sch} s = do
+  fromGeneratorString : {auto ip : schemaImp sch FromJSD} -> String -> JS_IO (Event (Record sch))
+  fromGeneratorString {ip} {sch} s = do
     eventRef <- jscall ("(" ++ s ++ ")()") (JS_IO JSRef)
     pure (fromEventReference {ip=ip} {sch=sch} eventRef)
 
+  export
+  partial
+  fromGeneratorReference : {auto ip : schemaImp sch FromJSD} -> JSRef -> JS_IO (Event (Record sch))
+  fromGeneratorReference {ip} {sch} ref = do
+    eventRef <- jscall "%0.apply()" (JSRef -> JS_IO JSRef) ref
+    pure (fromEventReference {ip=ip} {sch=sch} eventRef)
+
+  
