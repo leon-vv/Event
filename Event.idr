@@ -1,9 +1,8 @@
 module Event
 
 import Record
-import Record.JS
 
-import IdrisScript
+import FerryJS
 
 %default total
 
@@ -53,28 +52,28 @@ namespace JS
 
   export
   partial
-  fromEventReference : {auto ip : SchemaImp sch FromJSD} -> JSRef -> Event (Record sch)
-  fromEventReference {ip} {sch} eventRef = do
-    obj <- jscall "%0.getValue()" (JSRef -> JS_IO JSRef) eventRef
-    rec <- objectToRecordUnsafe {schema=[("set", Bool), ("value", JSRef)]} obj
-    (if rec .. "set" then Functor.map Just (objectToRecordUnsafe {fp=ip} {schema=sch} (rec .. "value"))
-                     else pure Nothing)
+  fromEventReference : {auto fjs : FromJS (Record sch)} -> Ptr -> Event (Record sch)
+  fromEventReference {fjs=FromJSFun f} {sch} eventRef = do
+    obj <- jscall "%0.getValue()" (Ptr -> JS_IO Ptr) eventRef
+    pure $ (let rec = fromJS {to=Record [("set", Bool), ("value", Ptr)]} obj
+            in if rec .. "set" then Just (f (rec .. "value"))
+                            else Nothing)
 
   -- Given a string which evaluates to an event generator, return an IO action
   -- which will return an event
   %inline                     
   export
   partial
-  fromGeneratorString : {auto ip : SchemaImp sch FromJSD} -> String -> JS_IO (Event (Record sch))
-  fromGeneratorString {ip} {sch} s = do
-    eventRef <- jscall ("(" ++ s ++ ")()") (JS_IO JSRef)
-    pure (fromEventReference {ip=ip} {sch=sch} eventRef)
+  fromGeneratorString : {auto fjs: FromJS (Record sch)} -> String -> JS_IO (Event (Record sch))
+  fromGeneratorString {fjs} {sch} s = do
+    eventRef <- jscall ("(" ++ s ++ ")()") (JS_IO Ptr)
+    pure (fromEventReference {fjs=fjs} {sch=sch} eventRef)
 
   export
   partial
-  fromGeneratorReference : {auto ip : SchemaImp sch FromJSD} -> JSRef -> JS_IO (Event (Record sch))
-  fromGeneratorReference {ip} {sch} ref = do
-    eventRef <- jscall "%0.apply()" (JSRef -> JS_IO JSRef) ref
-    pure (fromEventReference {ip=ip} {sch=sch} eventRef)
+  fromGeneratorReference : {auto fjs: FromJS (Record sch)} -> Ptr -> JS_IO (Event (Record sch))
+  fromGeneratorReference {fjs} {sch} ref = do
+    eventRef <- jscall "%0.apply()" (Ptr -> JS_IO Ptr) ref
+    pure (fromEventReference {fjs=fjs} {sch=sch} eventRef)
 
   

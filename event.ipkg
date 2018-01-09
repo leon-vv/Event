@@ -1,5 +1,5 @@
 package event
 
-pkgs = record_, idrisscript
+pkgs = record_, ferryjs
 
 modules = Event
