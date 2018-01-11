@@ -3,3 +3,5 @@ package event
 pkgs = record_, ferryjs
 
 modules = Event
+
+objs = runtime.js

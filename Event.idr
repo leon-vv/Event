@@ -6,8 +6,8 @@ import FerryJS
 
 %default total
 
-%include JavaScript "./Event/runtime.js"
-%include Node "./Event/runtime.js"
+%include JavaScript "event/runtime.js"
+%include Node "event/runtime.js"
 
 public export
 Event : Type -> Type
