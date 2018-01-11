@@ -4,6 +4,8 @@ import Record
 
 import FerryJS
 
+import Debug.Error
+
 %default total
 
 %include JavaScript "event/runtime.js"
@@ -55,9 +57,10 @@ namespace JS
   fromEventReference : {auto fjs : FromJS (Record sch)} -> Ptr -> Event (Record sch)
   fromEventReference {fjs=FromJSFun f} {sch} eventRef = do
     obj <- jscall "%0.getValue()" (Ptr -> JS_IO Ptr) eventRef
-    pure $ (let rec = fromJS {to=Record [("set", Bool), ("value", Ptr)]} obj
-            in if rec .. "set" then Just (f (rec .. "value"))
-                            else Nothing)
+    pure $ let rec = fromJSUnsafe {to=Record [("set", Bool), ("value", Ptr)]} obj
+           in if rec .. "set" then (case (f (rec .. "value")) of
+                                        Just x => Just x)
+                              else Nothing
 
   -- Given a string which evaluates to an event generator, return an IO action
   -- which will return an event
