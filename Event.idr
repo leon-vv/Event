@@ -32,8 +32,9 @@ public export
 data Target = Node | Browser
 
 export
-fromNativeEventToPtrEvent : Target -> Ptr -> String -> Event Ptr
-fromNativeEventToPtrEvent t evRef name = 
+export
+ptrToEventPtr : Target -> Ptr -> String -> Event Ptr
+ptrToEventPtr t evRef name = 
   MkEvent (\cb => assert_total $ case t of
           Node => do
               rem <- jscall "addListenerNode(%0, %1, %2)"
@@ -52,16 +53,17 @@ fromNativeEventToPtrEvent t evRef name =
 
 export
 partial
-fromNativeEvent : {auto fjs : FromJS to} -> Target -> Ptr -> String -> Event to
-fromNativeEvent {fjs} t evRef name =
-  map fromJSUnsafe . fromNativeEventToPtrEvent t evRef $ name
+ptrToEvent : {auto fjs : FromJS to} -> Target -> Ptr -> String -> Event to
+ptrToEvent {fjs} t evRef name =
+  map fromJSUnsafe . ptrToEventPtr t evRef $ name
 
 partial
 %inline
-fromNativeEventString : {fjs : FromJS to} -> Target -> String -> String -> Event to
-fromNativeEventString {fjs} t expr name =
+stringExprToEvent : {fjs : FromJS to} -> Target -> String -> String -> Event to
+stringExprToEvent {fjs} t expr name =
   let ptr = unsafePerformIO $ jscall expr (JS_IO Ptr)
-  in fromNativeEvent {fjs=fjs} t ptr name
+  in ptrToEvent {fjs=fjs} t ptr name
+
 
 public export
 record Program state msg where
