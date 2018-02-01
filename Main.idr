@@ -20,7 +20,7 @@ partial
 mouseClick : Event (Record Main.clickSchema)
 mouseClick = 
   let ref = unsafePerformIO $ jscall "document.body" (JS_IO Ptr)
-  in fromNativeEvent {to=Record clickSchema} ref "click"
+  in fromNativeEvent {to=Record clickSchema} Browser ref "click"
 
 partial
 stateEvent : Event Msg

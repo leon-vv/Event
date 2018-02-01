@@ -28,32 +28,40 @@ combine (MkEvent f1) (MkEvent f2) =
     rem2 <- f2 cb
     pure (rem1 *> rem2))
 
+public export
+data Target = Node | Browser
+
 export
-fromNativeEventToPtrEvent : Ptr -> String -> Event Ptr
-fromNativeEventToPtrEvent evRef name = 
-  MkEvent (\cb =>
-        let jsFn = MkJsFn cb
-        in assert_total $ do
-          rem <- jscall
-            "addListener(%0, %1, %2)"
-            (Ptr -> String -> JsFn (Ptr -> JS_IO ()) -> JS_IO Ptr)
-            evRef
-            name
-            jsFn
-          pure (believe_me {b=JS_IO ()} rem))
+fromNativeEventToPtrEvent : Target -> Ptr -> String -> Event Ptr
+fromNativeEventToPtrEvent t evRef name = 
+  MkEvent (\cb => assert_total $ case t of
+          Node => do
+              rem <- jscall "addListenerNode(%0, %1, %2)"
+                              (Ptr -> String -> JsFn (Ptr -> JS_IO ()) -> JS_IO Ptr)
+                              evRef
+                              name
+                              (MkJsFn cb)
+              pure (believe_me rem)
+          Browser => do
+              rem <- jscall "addListenerBrowser(%0, %1, %2)"
+                            (Ptr -> String -> JsFn (Ptr -> JS_IO ()) -> JS_IO Ptr)
+                            evRef
+                            name
+                            (MkJsFn cb)
+              pure (believe_me rem))
 
 export
 partial
-fromNativeEvent : {auto fjs : FromJS to} -> Ptr -> String -> Event to
-fromNativeEvent {fjs} evRef name =
-  map fromJSUnsafe . fromNativeEventToPtrEvent evRef $ name
+fromNativeEvent : {auto fjs : FromJS to} -> Target -> Ptr -> String -> Event to
+fromNativeEvent {fjs} t evRef name =
+  map fromJSUnsafe . fromNativeEventToPtrEvent t evRef $ name
 
 partial
 %inline
-fromNativeEventString : {fjs : FromJS to} -> String -> String -> Event to
-fromNativeEventString {fjs} expr name =
+fromNativeEventString : {fjs : FromJS to} -> Target -> String -> String -> Event to
+fromNativeEventString {fjs} t expr name =
   let ptr = unsafePerformIO $ jscall expr (JS_IO Ptr)
-  in fromNativeEvent {fjs=fjs} ptr name
+  in fromNativeEvent {fjs=fjs} t ptr name
 
 public export
 record Program state msg where
