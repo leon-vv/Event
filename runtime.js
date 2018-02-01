@@ -1,47 +1,18 @@
 
-var clearFun = null;
+var remFun = null
 
-function EventHandle(setCallback) {
+function addListener(obj, on, f) {
+    obj.addEventListener(on, f)
 
-    var lastValueSet = false;
-    var lastValue = {};
-
-    setCallback(function(e) {
-        lastValue = e;
-        lastValueSet = true;
-
-        clearFun = function() {
-            lastValueSet = false;
-        }
-
-        trigger();
-    });
-
-    this.getValue = function() {
-        return { 
-            "set": lastValueSet,
-            "value": lastValue
-        };
-    };
-}
-
-function eventGenerator(setCallback) {
-    
-    return function () {
-        return new EventHandle(setCallback);
+    return function() {
+        obj.removeEventListener(on, f)
     }
 }
 
-
-var state = null;
-var triggerFun = null;
-
-function setupState(state_, triggerFun_) {
-    state = state_;
-    triggerFun = triggerFun_;
+function setRemove(f) {
+    remFun = f
 }
 
-function trigger() {
-    state = triggerFun(state);
-    clearFun();
+function removeCb() {
+    remFun()
 }
