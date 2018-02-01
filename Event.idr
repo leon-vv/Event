@@ -32,6 +32,31 @@ public export
 data Target = Node | Browser
 
 export
+singlifyNativeEvent : Target -> Ptr -> Ptr
+singlifyNativeEvent Node ev = unsafePerformIO $ jscall
+  """{
+        on: function(evName, f) {
+            %0.on(evName, function() {
+                f(arguments)
+            });
+        },
+        removeListener: function(evName, f) {
+            %0.removeListener(f)
+        }
+    }""" (Ptr -> JS_IO Ptr) ev
+singlifyNativeEvent Browser ev = unsafePerformIO $ jscall
+  """{
+        addEventListener: function(evName, f) {
+            %0.addEventListener(evName, function() {
+                f(arguments)
+            });
+        },
+        removeEventListener: function(evName, f) {
+            %0.removeEventListener(f)
+        }
+    }""" (Ptr -> JS_IO Ptr) ev
+
+
 export
 ptrToEventPtr : Target -> Ptr -> String -> Event Ptr
 ptrToEventPtr t evRef name = 

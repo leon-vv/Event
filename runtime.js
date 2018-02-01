@@ -17,6 +17,35 @@ function addListenerNode(obj, evName, f) {
     }
 }
 
+function singlifyEventBrowser(ev) {
+
+    return {
+        addEventListener: function(evName, f) {
+            ev.addEventListener(evName, function() {
+                f(arguments)
+            });
+        },
+        removeEventListener: function(evName, f) {
+            ev.removeEventListener(evName, f)
+        }
+    }
+}
+
+function singlifyEventNode(ev) {
+
+    return {
+        on: function(evName, f) {
+            ev.on(evName, function() {
+                f(arguments)
+            });
+        },
+        removeListener: function(evName, f) {
+            ev.removeListener(f)
+        }
+    }
+}
+
+
 
 function setRemove(f) {
     remFun = f
