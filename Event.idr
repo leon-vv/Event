@@ -20,18 +20,13 @@ Functor Event where
   map f (MkEvent setCb) =
     MkEvent (\cb => setCb (\a => cb (f a)))
 
-{-
 export
 combine : Event a -> Event a -> Event a
 combine (MkEvent f1) (MkEvent f2) =
-  let newFun = unsafePerformIO $ jscall
-        "combine(%0, %1)"
-        (Ptr -> Ptr -> JS_IO Ptr)
-        f1
-        f2
-  in MkEvent newFun
-
--}
+  MkEvent (\cb => do
+    rem1 <- f1 cb
+    rem2 <- f2 cb
+    pure (rem1 *> rem2))
 
 export
 fromNativeEventToPtrEvent : Ptr -> String -> Event Ptr
