@@ -1,6 +1,4 @@
 
-var remFun = null
-
 function addListenerBrowser(obj, evName, f) {
     obj.addEventListener(evName, f)
 
@@ -45,7 +43,7 @@ function singlifyEventNode(ev) {
     }
 }
 
-
+var remFun = null
 
 function setRemove(f) {
     remFun = f

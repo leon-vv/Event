@@ -58,10 +58,11 @@ singlifyNativeEvent Browser ev = unsafePerformIO $ jscall
 
 
 export
-ptrToEventPtr : Target -> Ptr -> String -> Event Ptr
-ptrToEventPtr t evRef name = 
+ptrToEventPtr : Target -> JS_IO Ptr -> String -> Event Ptr
+ptrToEventPtr t evRefIO name = 
   MkEvent (\cb => assert_total $ case t of
           Node => do
+              evRef <- evRefIO
               rem <- jscall "addListenerNode(%0, %1, %2)"
                               (Ptr -> String -> JsFn (Ptr -> JS_IO ()) -> JS_IO Ptr)
                               evRef
@@ -69,6 +70,7 @@ ptrToEventPtr t evRef name =
                               (MkJsFn cb)
               pure (believe_me rem)
           Browser => do
+              evRef <- evRefIO
               rem <- jscall "addListenerBrowser(%0, %1, %2)"
                             (Ptr -> String -> JsFn (Ptr -> JS_IO ()) -> JS_IO Ptr)
                             evRef
@@ -78,16 +80,15 @@ ptrToEventPtr t evRef name =
 
 export
 partial
-ptrToEvent : {auto fjs : FromJS to} -> Target -> Ptr -> String -> Event to
+ptrToEvent : {auto fjs : ToIdris to} -> Target -> JS_IO Ptr -> String -> Event to
 ptrToEvent {fjs} t evRef name =
-  map fromJSUnsafe . ptrToEventPtr t evRef $ name
+  map toIdrisUnsafe . ptrToEventPtr t evRef $ name
 
 partial
 %inline
-stringExprToEvent : {fjs : FromJS to} -> Target -> String -> String -> Event to
+stringExprToEvent : {fjs : ToIdris to} -> Target -> String -> String -> Event to
 stringExprToEvent {fjs} t expr name =
-  let ptr = unsafePerformIO $ jscall expr (JS_IO Ptr)
-  in ptrToEvent {fjs=fjs} t ptr name
+  ptrToEvent {fjs=fjs} t (jscall expr (JS_IO Ptr)) name
 
 
 public export
