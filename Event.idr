@@ -80,16 +80,15 @@ ptrToEventPtr t evRefIO name =
 
 export
 partial
-ptrToEvent : {auto fjs : ToIdris to} -> Target -> JS_IO Ptr -> String -> Event to
-ptrToEvent {fjs} t evRef name =
+ptrToEvent : {auto ti : ToIdris to} -> Target -> JS_IO Ptr -> String -> Event to
+ptrToEvent {ti} t evRef name =
   map toIdrisUnsafe . ptrToEventPtr t evRef $ name
 
 partial
 %inline
-stringExprToEvent : {fjs : ToIdris to} -> Target -> String -> String -> Event to
-stringExprToEvent {fjs} t expr name =
-  ptrToEvent {fjs=fjs} t (jscall expr (JS_IO Ptr)) name
-
+stringExprToEvent : {ti : ToIdris to} -> Target -> String -> String -> Event to
+stringExprToEvent {ti} t expr name =
+  ptrToEvent {ti=ti} t (jscall expr (JS_IO Ptr)) name
 
 public export
 record Program state msg where
