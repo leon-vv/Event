@@ -6,7 +6,7 @@ import Record
 %default total
 
 State : Type
-State = Nat
+State = Nat 
 
 data Msg = Click Int
 
@@ -20,19 +20,19 @@ partial
 mouseClick : Event (Record Main.clickSchema)
 mouseClick = 
   let ref = unsafePerformIO $ jscall "document.body" (JS_IO Ptr)
-  in ptrToEvent {to=Record clickSchema} Browser ref "click"
+  in ptrToEvent {to=Record clickSchema} Browser (pure ref) "click"
 
 partial
-stateEvent : Event Msg
-stateEvent = map (\rec => Click (rec .. "clientX")) mouseClick
+toEvent : State -> Event Msg
+toEvent _ = map (\rec => Click (rec .. "clientX")) mouseClick
 
 partial
-nextState : State -> Msg -> JS_IO (Maybe (State, Event Msg))
-nextState n (Click _) = log n *> pure (Just (n + 1, stateEvent))
+nextState : State -> Msg -> JS_IO (Maybe (State))
+nextState n (Click _) = log n *> pure (Just (n + 1))
 
 partial
 program : Program State Msg
-program = MkProgram 0 stateEvent nextState
+program = MkProgram (pure 0) toEvent nextState
 
 partial
 main : JS_IO ()

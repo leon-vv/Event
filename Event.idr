@@ -93,23 +93,33 @@ stringExprToEvent {ti} t expr name =
 public export
 record Program state msg where
   constructor MkProgram
-  initalState : state
-  initalEvent : Event msg
-  nextState : state -> msg -> JS_IO . Maybe $ (state, Event msg)
+  initalState : JS_IO state
+  toEvent : state -> Event msg
 
-export
-partial
-run : Program state msg -> JS_IO ()
-run (MkProgram s (MkEvent setCb) next) =
-  let callback = \msg => (do
-                         jscall "removeCb()" (JS_IO ())
-                         maybe <- next s msg
-                         (case maybe of
-                            Just (newState, newEv) => run (MkProgram newState newEv next)
-                            Nothing => pure ()))
-  in do 
-    rem <- setCb callback
-    jscall "setRemove(%0)" (JsFn (() -> JS_IO ()) -> JS_IO ()) (MkJsFn (\() => rem))
+  -- If Nothing is returned,
+  -- the program stops
+  nextState : state -> msg -> JS_IO (Maybe state)
+
+mutual 
+
+  export
+  partial
+  run : Program state msg -> JS_IO ()
+  run (MkProgram sIO toEv nextState) = (do
+    s <- sIO
+    (let callback = callback s nextState toEv
+    in let (MkEvent setCb) = toEv s
+    in do rem <- setCb callback
+          jscall "setRemove(%0)" (JsFn (() -> JS_IO ()) -> JS_IO ()) (MkJsFn (\() => rem))))
+
+  partial
+  callback : state -> (state -> msg -> JS_IO (Maybe state)) -> (state -> Event msg) -> msg -> JS_IO ()
+  callback s nextState toEvent msg = (do
+      jscall "removeCb()" (JS_IO ())
+      maybe <- nextState s msg
+      (case maybe of
+          Just newState => run (MkProgram (pure newState) toEvent nextState)
+          Nothing => pure ()))
 
 
 
