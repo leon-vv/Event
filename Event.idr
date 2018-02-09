@@ -41,7 +41,7 @@ singlifyNativeEvent Node ev = unsafePerformIO $ jscall
             });
         },
         removeListener: function(evName, f) {
-            %0.removeListener(f)
+            %0.removeListener(evName, f)
         }
     }""" (Ptr -> JS_IO Ptr) ev
 singlifyNativeEvent Browser ev = unsafePerformIO $ jscall
@@ -52,7 +52,7 @@ singlifyNativeEvent Browser ev = unsafePerformIO $ jscall
             });
         },
         removeEventListener: function(evName, f) {
-            %0.removeEventListener(f)
+            %0.removeEventListener(evName, f)
         }
     }""" (Ptr -> JS_IO Ptr) ev
 
