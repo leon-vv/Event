@@ -34,27 +34,17 @@ data Target = Node | Browser
 export
 singlifyNativeEvent : Target -> Ptr -> Ptr
 singlifyNativeEvent Node ev = unsafePerformIO $ jscall
-  """{
-        on: function(evName, f) {
-            %0.on(evName, function() {
-                f(arguments)
-            });
-        },
-        removeListener: function(evName, f) {
-            %0.removeListener(evName, f)
-        }
-    }""" (Ptr -> JS_IO Ptr) ev
+    "singlifyEvent(%0, %1, %2)"
+    (Ptr -> String -> String -> JS_IO Ptr)
+    ev
+    "on"
+    "removeListener"
 singlifyNativeEvent Browser ev = unsafePerformIO $ jscall
-  """{
-        addEventListener: function(evName, f) {
-            %0.addEventListener(evName, function() {
-                f(arguments)
-            });
-        },
-        removeEventListener: function(evName, f) {
-            %0.removeEventListener(evName, f)
-        }
-    }""" (Ptr -> JS_IO Ptr) ev
+    "singlifyEvent(%0, %1, %2)"
+    (Ptr -> String -> String -> JS_IO Ptr)
+    ev
+    "addEventListener"
+    "removeEventListener"
 
 
 export
