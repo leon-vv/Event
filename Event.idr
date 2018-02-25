@@ -4,7 +4,7 @@ import Record
 
 import FerryJS
 
-import Debug.Error
+import Data.IORef
 
 %default total
 
@@ -107,19 +107,28 @@ mutual
   run : Program state msg -> JS_IO ()
   run (MkProgram sIO toEv nextState) = (do
     s <- sIO
-    (let callback = callback s nextState toEv
+    calledReference <- newIORef' False
+    (let callback = callback calledReference s nextState toEv
     in let (MkEvent setCb) = toEv s
     in do rem <- setCb callback
           jscall "setRemove(%0)" (JsFn (() -> JS_IO ()) -> JS_IO ()) (MkJsFn (\() => rem))))
 
+  -- All event listeners in JS are called, even if the first event listener
+  -- removes the second event listener. The 'IORef Bool' makes sure the nextState
+  -- function is only called once for an event if an object contains multiple listeners.
   partial
-  callback : state -> (state -> msg -> JS_IO (Maybe state)) -> (state -> Event msg) -> msg -> JS_IO ()
-  callback s nextState toEvent msg = (do
-      jscall "removeCb()" (JS_IO ())
-      maybe <- nextState s msg
-      (case maybe of
-          Just newState => run (MkProgram (pure newState) toEvent nextState)
-          Nothing => pure ()))
+  callback : IORef Bool -> state -> (state -> msg -> JS_IO (Maybe state)) -> (state -> Event msg) -> msg -> JS_IO ()
+  callback boolRef s nextState toEvent msg = do
+      called <- readIORef' boolRef
+      if called
+        then pure ()
+        else (do
+          writeIORef' boolRef True 
+          jscall "removeCb()" (JS_IO ())
+          maybe <- nextState s msg
+          case maybe of
+            Just newState => run (MkProgram (pure newState) toEvent nextState)
+            Nothing => pure ())
 
 
 
