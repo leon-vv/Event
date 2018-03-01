@@ -14,11 +14,17 @@ import Data.IORef
 export
 data Event : Type -> Type where
   MkEvent : ((a -> JS_IO ()) -> JS_IO (JS_IO ())) -> Event a
+  EmptyEvent : Event a
+
+export
+emptyEvent : Event a
+emptyEvent = EmptyEvent
 
 export
 Functor Event where
-  map f (MkEvent setCb) =
-    MkEvent (\cb => setCb (\a => cb (f a)))
+  map f ev = case ev of
+    MkEvent setCb => MkEvent (\cb => setCb (\a => cb (f a)))
+    EmptyEvent => EmptyEvent
 
 export
 combine : Event a -> Event a -> Event a
@@ -27,6 +33,12 @@ combine (MkEvent f1) (MkEvent f2) =
     rem1 <- f1 cb
     rem2 <- f2 cb
     pure (rem1 *> rem2))
+combine EmptyEvent ev = ev
+combine ev EmptyEvent = ev
+
+export
+combineMany : List (Event a) -> Event a
+combineMany = foldl combine EmptyEvent
 
 public export
 data Target = Node | Browser
@@ -81,27 +93,52 @@ stringExprToEvent {ti} t expr name =
   ptrToEvent {ti=ti} t (jscall expr (JS_IO Ptr)) name
 
 public export
-record Program state msg where
+record Program where
   constructor MkProgram
-  initalState : JS_IO state
+  initialState : JS_IO state
   toEvent : state -> Event msg
 
   -- If Nothing is returned,
   -- the program stops
   nextState : state -> msg -> JS_IO (Maybe state)
 
+combinePrograms : Program -> Program -> Program
+combinePrograms (MkProgram {msg=m1} i1 t1 n1) (MkProgram {msg=m2} i2 t2 n2) =
+  let init = (do
+              i1_ <- i1
+              i2_ <- i2
+              pure (i1_, i2_))
+  in let toEvent = (\(s1, s2) => combine (map Left (t1 s1)) (map Right (t2 s2)))
+  in let nextState = (\(s1, s2), msg =>
+                case msg of
+                  Left m => map (map (`MkPair` s2)) $ n1 s1 m
+                  Right m => map (map (MkPair s1)) $ n2 s2 m)
+  in (MkProgram {msg=Either m1 m2} init toEvent nextState)
+
+neutralProgram : Program
+neutralProgram = MkProgram {msg=()} (pure ()) (const EmptyEvent) (const . const . pure $ Nothing)
+
+Semigroup Program where
+  (<+>) = combinePrograms
+
+Monoid Program where
+  neutral = neutralProgram
+
 mutual 
 
   export
   partial
-  run : Program state msg -> JS_IO ()
-  run (MkProgram sIO toEv nextState) = (do
+  run : Program -> JS_IO ()
+  run (MkProgram sIO toEv nextState) = do
     s <- sIO
     calledReference <- newIORef' False
     (let callback = callback calledReference s nextState toEv
-    in let (MkEvent setCb) = toEv s
-    in do rem <- setCb callback
-          jscall "setRemove(%0)" (JsFn (() -> JS_IO ()) -> JS_IO ()) (MkJsFn (\() => rem))))
+    in (case toEv s of
+        MkEvent setCb => do
+          rem <- setCb callback
+          jscall "setRemove(%0)" (JsFn (() -> JS_IO ()) -> JS_IO ()) (MkJsFn (\() => rem))
+        EmptyEvent => pure ()))
+
 
   -- All event listeners in JS are called, even if the first event listener
   -- removes the second event listener. The 'IORef Bool' makes sure the nextState
