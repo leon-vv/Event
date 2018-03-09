@@ -3,10 +3,16 @@ module Event
 import Record
 
 import FerryJS
+import FerryJS.Util
 
+import System as S
 import Data.IORef
+import Debug.Error
 
 %default total
+
+-- To use the error function
+%language ElabReflection
 
 %include JavaScript "event/runtime.js"
 %include Node "event/runtime.js"
@@ -80,45 +86,59 @@ stringExprToEvent : {ti : ToIdris to} -> Target -> String -> String -> Event to
 stringExprToEvent {ti} t expr name =
   ptrToEvent {ti=ti} t (jscall expr (JS_IO Ptr)) name
 
+export
+Callback : Type -> Type
+Callback msg = msg -> JS_IO ()
+
+export
+PendingCallback : Type
+-- An IO action which removes the callback
+PendingCallback = JS_IO ()
+
 public export
 record Program state msg where
   constructor MkProgram
-  initalState : JS_IO state
-  toEvent : state -> Event msg
+  initalState : Callback msg -> JS_IO state
 
   -- If Nothing is returned,
   -- the program stops
   nextState : state -> msg -> JS_IO (Maybe state)
+
+export
+listen : Event msg -> Callback msg -> JS_IO PendingCallback
+listen (MkEvent setCb) cb = setCb cb >>= pure
+
+export
+unlisten : PendingCallback -> JS_IO ()
+unlisten = id 
 
 mutual 
 
   export
   partial
   run : Program state msg -> JS_IO ()
-  run (MkProgram sIO toEv nextState) = (do
-    s <- sIO
-    calledReference <- newIORef' False
-    (let callback = callback calledReference s nextState toEv
-    in let (MkEvent setCb) = toEv s
-    in do rem <- setCb callback
-          jscall "setRemove(%0)" (JsFn (() -> JS_IO ()) -> JS_IO ()) (MkJsFn (\() => rem))))
+  run (MkProgram {state} sIO nextState) = do
+    stateRef <- newIORef' (Nothing {a=state})
+    (let callback = callback stateRef nextState
+     in do
+       initialState <- sIO callback
+       writeIORef' stateRef (Just initialState))
 
   -- All event listeners in JS are called, even if the first event listener
   -- removes the second event listener. The 'IORef Bool' makes sure the nextState
   -- function is only called once for an event if an object contains multiple listeners.
   partial
-  callback : IORef Bool -> state -> (state -> msg -> JS_IO (Maybe state)) -> (state -> Event msg) -> msg -> JS_IO ()
-  callback boolRef s nextState toEvent msg = do
-      called <- readIORef' boolRef
-      if called
-        then pure ()
-        else (do
-          writeIORef' boolRef True 
-          jscall "removeCb()" (JS_IO ())
-          maybe <- nextState s msg
-          case maybe of
-            Just newState => run (MkProgram (pure newState) toEvent nextState)
-            Nothing => pure ())
+  callback : IORef (Maybe state) -> (state -> msg -> JS_IO (Maybe state)) -> msg -> JS_IO ()
+  callback s nextState msg = do
+      state <- readIORef' s 
+      case state of
+          -- Message comes in while the initial state has not yet been computed.
+          Nothing => error "Event module: initial state has not been computed"
+          Just currentState => (do
+            maybeNextState <- nextState currentState msg
+            case maybeNextState of
+              Just nextState => writeIORef' s (Just nextState)
+              Nothing => exit 0)
 
 
 

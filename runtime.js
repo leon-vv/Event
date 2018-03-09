@@ -45,13 +45,3 @@ function singlifyEvent(obj, onKey, removeKey) {
 
     return newObj
 }
-
-var remFun = null
-
-function setRemove(f) {
-    remFun = f
-}
-
-function removeCb() {
-    remFun()
-}
