@@ -17,6 +17,11 @@ import Debug.Error
 %include JavaScript "event/runtime.js"
 %include Node "event/runtime.js"
 
+
+-- An Event is basically something that can be listened for.
+-- Given a callback function the Event returns an 'outer' JS_IO
+-- that registers the callback. The inner 'JS_IO' can be used
+-- to remove the callback again.
 export
 data Event : Type -> Type where
   MkEvent : ((a -> JS_IO ()) -> JS_IO (JS_IO ())) -> Event a
@@ -25,6 +30,7 @@ export
 Functor Event where
   map f (MkEvent setCb) =
     MkEvent (\cb => setCb (\a => cb (f a)))
+
 
 export
 combine : Event a -> Event a -> Event a
