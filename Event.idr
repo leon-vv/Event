@@ -17,23 +17,82 @@ import Debug.Error
 %include JavaScript "event/runtime.js"
 %include Node "event/runtime.js"
 
+public export
+data EventType =
+    Single
+  | Multiple
 
 -- An Event is basically something that can be listened for.
 -- Given a callback function the Event returns an 'outer' JS_IO
 -- that registers the callback. The inner 'JS_IO' can be used
 -- to remove the callback again.
 export
-data Event : Type -> Type where
-  MkEvent : ((a -> JS_IO ()) -> JS_IO (JS_IO ())) -> Event a
+data Event : EventType -> Type -> Type where
+  MkEvent : ((a -> JS_IO ()) -> JS_IO (JS_IO ())) -> Event type a
+
+emptyEvent : a -> Event Single a
+emptyEvent a = MkEvent (\cb => do cb a; pure (pure ()))
+
+bindEvent : Event Single a -> (a -> Event Single b) -> Event Single b
+bindEvent (MkEvent setCbA) f = MkEvent $ \cb =>
+  do
+    ioRef <- newIORef' (Nothing {a=JS_IO ()})
+    remA <- setCbA (\a =>
+              let (MkEvent setCbB) = f a
+              in do 
+                remB <- setCbB cb
+                writeIORef' ioRef (Just remB))
+    pure (do
+          remA
+          maybeRem <- readIORef' ioRef
+          (case maybeRem of
+            Nothing => pure ()
+            Just remB => remB))
+
+-- See comment above 'bindEvent'. 
+joinEvent : Event Single (Event Single a) -> Event Single a
+joinEvent (MkEvent setCb1) = MkEvent $ \cb => setCb1 (\(MkEvent setCb2) => ignore $ setCb2 cb)
+
+-- It's not known which of the events fires first. So we cannot
+-- set a callback while in another callback as done for the functions above.
+-- The solution is to manage a bit of state using an IORef.
+applyEvent : Event Single (a -> b) -> Event Single a -> Event Single b
+applyEvent {a} {b} (MkEvent setCb1) (MkEvent setCb2) =
+  MkEvent $ \cb => do
+      ioRef <- newIORef' {ffi=FFI_JS} (Nothing {a=Either (a -> b) a})
+      rem1 <- setCb1 (\f => do
+              maybeVal <- readIORef' ioRef
+              case maybeVal of
+                Nothing => writeIORef' ioRef (Just $ Left f)
+                Just (Right val) => cb (f val)
+                Just (Left _) => error "Event: single event produced more often")
+      rem2 <- setCb2 (\val => do
+              maybeFun <- readIORef' ioRef
+              case maybeFun of
+                Nothing => writeIORef' ioRef (Just $ Right val)
+                Just (Left f) => cb (f val)
+                Just (Right _) => error "Event: single event produced more often")
+      pure (rem1 *> rem2)
+
 
 export
-Functor Event where
+Functor (Event t) where
   map f (MkEvent setCb) =
     MkEvent (\cb => setCb (\a => cb (f a)))
 
+export
+Applicative (Event Single) where
+  pure = emptyEvent
+  (<*>) = applyEvent
 
 export
-combine : Event a -> Event a -> Event a
+Monad (Event Single) where
+  (>>=) = bindEvent
+  join = joinEvent
+
+
+export
+combine : Event t a -> Event t a -> Event t a
 combine (MkEvent f1) (MkEvent f2) =
   MkEvent (\cb => do
     rem1 <- f1 cb
@@ -60,7 +119,7 @@ singlifyNativeEvent Browser ev = unsafePerformIO $ jscall
 
 
 export
-ptrToEventPtr : Target -> JS_IO Ptr -> String -> Event Ptr
+ptrToEventPtr : Target -> JS_IO Ptr -> String -> Event type Ptr
 ptrToEventPtr t evRefIO name = 
   MkEvent (\cb => assert_total $ case t of
           Node => do
@@ -82,13 +141,13 @@ ptrToEventPtr t evRefIO name =
 
 export
 partial
-ptrToEvent : {auto ti : ToIdris to} -> Target -> JS_IO Ptr -> String -> Event to
+ptrToEvent : {auto ti : ToIdris to} -> Target -> JS_IO Ptr -> String -> Event type to
 ptrToEvent {ti} t evRef name =
   map toIdrisUnsafe . ptrToEventPtr t evRef $ name
 
 partial
 %inline
-stringExprToEvent : {ti : ToIdris to} -> Target -> String -> String -> Event to
+stringExprToEvent : {ti : ToIdris to} -> Target -> String -> String -> Event type to
 stringExprToEvent {ti} t expr name =
   ptrToEvent {ti=ti} t (jscall expr (JS_IO Ptr)) name
 
@@ -111,7 +170,7 @@ Program : Type -> Type -> Type
 Program state msg = ProgramMsg state msg -> JS_IO (Maybe state)
 
 export
-listen : Event msg -> Callback msg -> JS_IO PendingCallback
+listen : Event type msg -> Callback msg -> JS_IO PendingCallback
 listen (MkEvent setCb) cb = setCb cb >>= pure
 
 export
