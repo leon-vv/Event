@@ -102,13 +102,13 @@ PendingCallback : Type
 PendingCallback = JS_IO ()
 
 public export
-record Program state msg where
-  constructor MkProgram
-  initalState : Callback msg -> JS_IO state
+data ProgramMsg state msg =
+  ProgramStart (Callback msg)
+  | ProgramNext state msg
 
-  -- If Nothing is returned,
-  -- the program stops
-  nextState : state -> msg -> JS_IO (Maybe state)
+public export
+Program : Type -> Type -> Type
+Program state msg = ProgramMsg state msg -> JS_IO (Maybe state)
 
 export
 listen : Event msg -> Callback msg -> JS_IO PendingCallback
@@ -123,28 +123,30 @@ mutual
   export
   partial
   run : Program state msg -> JS_IO ()
-  run (MkProgram {state} sIO nextState) = do
+  run {state} computeState = do
     stateRef <- newIORef' (Nothing {a=state})
-    (let callback = callback stateRef nextState
+    (let callback = callback stateRef computeState
      in do
-       initialState <- sIO callback
-       writeIORef' stateRef (Just initialState))
+        initialState <- computeState (ProgramStart callback)
+        case initialState of
+             Nothing => pure ()
+             Just st => writeIORef' stateRef (Just st))
 
   -- All event listeners in JS are called, even if the first event listener
-  -- removes the second event listener. The 'IORef Bool' makes sure the nextState
+  -- removes the second event listener. The 'IORef Bool' makes sure the computeState
   -- function is only called once for an event if an object contains multiple listeners.
   partial
-  callback : IORef (Maybe state) -> (state -> msg -> JS_IO (Maybe state)) -> msg -> JS_IO ()
-  callback s nextState msg = do
-      state <- readIORef' s 
-      case state of
+  callback : IORef (Maybe state) -> (ProgramMsg state msg -> JS_IO (Maybe state)) -> Callback msg
+  callback s computeState msg = do
+      currState <- readIORef' s 
+      (case currState of
           -- Message comes in while the initial state has not yet been computed.
-          Nothing => error "Event module: initial state has not been computed"
-          Just currentState => (do
-            maybeNextState <- nextState currentState msg
+        Nothing => error "Event module: initial state has not been computed"
+        Just currState' => (do
+            maybeNextState <- computeState (ProgramNext currState' msg)
             case maybeNextState of
-              Just nextState => writeIORef' s (Just nextState)
-              Nothing => exit 0)
+              Just newState => writeIORef' s (Just newState)
+              Nothing => exit 0))
 
 
 
