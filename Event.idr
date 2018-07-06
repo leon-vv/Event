@@ -170,6 +170,10 @@ Program : Type -> Type -> Type
 Program state msg = ProgramMsg state msg -> JS_IO (Maybe state)
 
 export
+execute : Event type (JS_IO a) -> JS_IO PendingCallback
+execute (MkEvent setCb) = setCb (\io => ignore $ unsafePerformIO io)
+
+export
 listen : Event type msg -> Callback msg -> JS_IO PendingCallback
 listen (MkEvent setCb) cb = setCb cb >>= pure
 
