@@ -22,13 +22,17 @@ data EventType =
     Single
   | Multiple
 
+export
+Callback : Type -> Type
+Callback msg = msg -> JS_IO ()
+
 -- An Event is basically something that can be listened for.
 -- Given a callback function the Event returns an 'outer' JS_IO
 -- that registers the callback. The inner 'JS_IO' can be used
 -- to remove the callback again.
 export
 data Event : EventType -> Type -> Type where
-  MkEvent : ((a -> JS_IO ()) -> JS_IO (JS_IO ())) -> Event type a
+  MkEvent : (Callback msg -> JS_IO (JS_IO ())) -> Event type msg
 
 emptyEvent : a -> Event Single a
 emptyEvent a = MkEvent (\cb => do cb a; pure (pure ()))
@@ -152,10 +156,6 @@ stringExprToEvent {ti} t expr name =
   ptrToEvent {ti=ti} t (jscall expr (JS_IO Ptr)) name
 
 export
-Callback : Type -> Type
-Callback msg = msg -> JS_IO ()
-
-export
 PendingCallback : Type
 -- An IO action which removes the callback
 PendingCallback = JS_IO ()
@@ -171,7 +171,9 @@ Program state msg = ProgramMsg state msg -> JS_IO (Maybe state)
 
 export
 execute : Event type (JS_IO a) -> JS_IO PendingCallback
-execute (MkEvent setCb) = setCb (\io => ignore $ unsafePerformIO io)
+execute (MkEvent setCb) = setCb (\io =>
+                          let _ = unsafePerformIO io
+                          in pure ())
 
 export
 listen : Event type msg -> Callback msg -> JS_IO PendingCallback
