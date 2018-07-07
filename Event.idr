@@ -53,9 +53,10 @@ bindEvent (MkEvent setCbA) f = MkEvent $ \cb =>
             Nothing => pure ()
             Just remB => remB))
 
--- See comment above 'bindEvent'. 
+-- Todo: also unbind inner event
 joinEvent : Event Single (Event Single a) -> Event Single a
 joinEvent (MkEvent setCb1) = MkEvent $ \cb => setCb1 (\(MkEvent setCb2) => ignore $ setCb2 cb)
+
 
 -- It's not known which of the events fires first. So we cannot
 -- set a callback while in another callback as done for the functions above.
@@ -122,6 +123,10 @@ singlifyNativeEvent Browser ev = unsafePerformIO $ jscall
     "removeEventListener"
 
 
+-- Note: by using believe_me we assume that the representation of JS_IO ()
+-- is a normal javascript function. This does not have to be the case.
+-- Todo: remove this assumption by holding on to a Ptr and calling the
+-- 'remove' function explicitly.
 export
 ptrToEventPtr : Target -> JS_IO Ptr -> String -> Event type Ptr
 ptrToEventPtr t evRefIO name = 
