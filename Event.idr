@@ -175,14 +175,14 @@ Program : Type -> Type -> Type
 Program state msg = ProgramMsg state msg -> JS_IO (Maybe state)
 
 export
-execute : Event type (JS_IO a) -> JS_IO PendingCallback
-execute (MkEvent setCb) = setCb (\io =>
-                          let _ = unsafePerformIO io
-                          in pure ())
-
-export
 listen : Event type msg -> Callback msg -> JS_IO PendingCallback
 listen (MkEvent setCb) cb = setCb cb >>= pure
+
+-- Wait for the event and run the JS_IO.
+-- I'm not sure this is a valid use case of unsafePerformIO.
+export
+execute : Event type (JS_IO a) -> JS_IO PendingCallback
+execute ev = listen (unsafePerformIO <$> ev) (const $ pure ())
 
 export
 unlisten : PendingCallback -> JS_IO ()
