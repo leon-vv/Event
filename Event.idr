@@ -184,6 +184,11 @@ export
 execute : Event type (JS_IO a) -> JS_IO PendingCallback
 execute ev = listen (unsafePerformIO <$> ev) (const $ pure ())
 
+-- Wait for the event and then run a different JS_IO.
+export
+doAfter : Event Single a -> JS_IO b -> JS_IO PendingCallback
+doAfter ev io = execute (ev *> pure io)
+
 export
 unlisten : PendingCallback -> JS_IO ()
 unlisten = id 
