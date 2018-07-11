@@ -1,3 +1,7 @@
+{- This Source Code Form is subject to the terms of the Mozilla Public
+ - License, v. 2.0. If a copy of the MPL was not distributed with this
+ - file, You can obtain one at http://mozilla.org/MPL/2.0/. -}
+
 module Event
 
 import Record
@@ -38,8 +42,8 @@ emptyEvent : a -> Event Single a
 emptyEvent a = MkEvent (\cb => do cb a; pure (pure ()))
 
 bindEvent : Event Single a -> (a -> Event Single b) -> Event Single b
-bindEvent (MkEvent setCbA) f = MkEvent $ \cb =>
-  do
+bindEvent (MkEvent setCbA) f =
+  MkEvent $ \cb => do
     ioRef <- newIORef' (Nothing {a=JS_IO ()})
     remA <- setCbA (\a =>
               let (MkEvent setCbB) = f a
@@ -64,20 +68,20 @@ joinEvent (MkEvent setCb1) = MkEvent $ \cb => setCb1 (\(MkEvent setCb2) => ignor
 applyEvent : Event Single (a -> b) -> Event Single a -> Event Single b
 applyEvent {a} {b} (MkEvent setCb1) (MkEvent setCb2) =
   MkEvent $ \cb => do
-      ioRef <- newIORef' {ffi=FFI_JS} (Nothing {a=Either (a -> b) a})
-      rem1 <- setCb1 (\f => do
-              maybeVal <- readIORef' ioRef
-              case maybeVal of
-                Nothing => writeIORef' ioRef (Just $ Left f)
-                Just (Right val) => cb (f val)
-                Just (Left _) => error "Event: single event produced more often")
-      rem2 <- setCb2 (\val => do
-              maybeFun <- readIORef' ioRef
-              case maybeFun of
-                Nothing => writeIORef' ioRef (Just $ Right val)
-                Just (Left f) => cb (f val)
-                Just (Right _) => error "Event: single event produced more often")
-      pure (rem1 *> rem2)
+    ioRef <- newIORef' {ffi=FFI_JS} (Nothing {a=Either (a -> b) a})
+    rem1 <- setCb1 (\f => do
+            maybeVal <- readIORef' ioRef
+            case maybeVal of
+              Nothing => writeIORef' ioRef (Just $ Left f)
+              Just (Right val) => cb (f val)
+              Just (Left _) => error "Event: single event produced more often")
+    rem2 <- setCb2 (\val => do
+            maybeFun <- readIORef' ioRef
+            case maybeFun of
+              Nothing => writeIORef' ioRef (Just $ Right val)
+              Just (Left f) => cb (f val)
+              Just (Right _) => error "Event: single event produced more often")
+    pure (rem1 *> rem2)
 
 
 export
